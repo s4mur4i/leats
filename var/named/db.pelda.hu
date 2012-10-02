@@ -1,0 +1,19 @@
+; BIND db file for pelda.hu
+
+$TTL 86400
+
+@       IN      SOA     1.1.1.1.      krisztian.banhidy.it-services.hu. (
+                        2012091901	; serial number YYMMDDNN
+                        28800           ; Refresh
+                        7200            ; Retry
+                        864000          ; Expire
+                        86400           ; Min TTL
+			)
+
+                NS      desktop.pelda.hu. 
+desktop		IN A 	1.1.1.1
+server		IN A 	1.1.1.2
+desktopc	IN A 	2.2.2.1
+serverc		IN A 	2.2.2.2
+
+$ORIGIN pelda.hu.
