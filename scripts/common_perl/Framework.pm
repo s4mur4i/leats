@@ -18,11 +18,12 @@ use strict;
 use warnings;
 use Sys::Virt;
 use Term::ANSIColor;
+use Net::OpenSSH;
 BEGIN {
 	use Exporter ();
 
     	@Framework::ISA         = qw(Exporter);
-    	@Framework::EXPORT      = qw( &restart &shutdown &start &mount &umount &verbose &connecto &return &grade &timedconTo &useage &hint );
+    	@Framework::EXPORT      = qw( &restart &shutdown &start &mount &umount &verbose &connecto &return &grade &timedconTo &useage &hint &ssh_connect );
     	@Framework::EXPORT_OK   = qw( $verbose $topic $author $version $hint $problem $name);
 
 }
@@ -235,6 +236,13 @@ sub useage() {
         print "Designed by $author, version $version\n";
         exit 0;
 };
+sub ssh_connect() {
+	$verbose and print "SSH connection to server.\n";
+	open my $stderr_fh, '>', '/dev/null';
+	my $ssh = Net::OpenSSH->new("server", key_path=>"/scripts/ssh-key/id_rsa", default_stderr_fh => $stderr_fh);
+  	$ssh->error and ( $verbose and print "Couldn't establish SSH connection: ". $ssh->error);
+	return $ssh;
+}
 
 sub hint() {
 	### Hint for solution
