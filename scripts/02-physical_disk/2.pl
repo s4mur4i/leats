@@ -22,9 +22,9 @@ our $author='Krisztian Banhidy <krisztian@banhidy.hu>';
 #our $author='Richard Gruber <richard.gruber@it-services.hu>';
 our $version="v0.1";
 our $topic="Physical disk management";
-our $problem="1";
-our $description="Additional disk has been added to your server. Initialize it, \ncreate a 100 MB (+-10%) ext3 partition on it and persistently mount it on /mnt/das.\n";
-our $hint="Find the device with fdisk, create a partition, \nthen create a filesystem and create entry in fstab\n";
+our $problem="2";
+our $description="Extend the partion previously created to 180 Mb (+-10%). \nA test file was created, which should be left on the filesystem. \nDo not destroy the filesystem and just recreate it.\n";
+our $hint="With fdisk delete the partition and just recreate it from same \nstarting sector. No metadata will be deleted. Then just use resize2fs.\n";
 #
 #
 #
@@ -56,24 +56,23 @@ GetOptions("help|?|h" => \$help,
 # Subs
 #
 sub break() {
-	print "Break has been selected.\n";
+	print "Running Dependency check. This may take some time.\n";
 	&pre();
-	$verbose and print "Pre complete breaking\n";
-	my $ret=Disk::lv_create("vdb","200","vdb");
-	if ( $ret == 1 ) {
-		$verbose and print "Trying to repair.\n";
-		Disk::lv_remove("vdb");
-		Disk::lv_create("vdb","200","vdb");
+	print "Break has been selected.\n";
+	my $ssh=Framework::ssh_connect;
+	my $ret=$ssh->capture("echo `date +%s` > /mnt/das/mulder 2>/dev/null; echo \$?");
+	if ( $ret == 0 ) {
+		print "Your task: $description\n";
 	} else {
-		print "Disk attached to server. Local disk is vdb\n";
+		print "Could no create data on server.\n";
+		exit 1;
 	}
-	print "Your task: $description\n";
 }
 
 sub grade() {
 	print "Grade has been selected.\n";
 	print "rebooting server:";
-	Framework::restart;
+	#Framework::restart;
 	Framework::grade(Framework::timedconTo("60"));
 	## Checking if mounted
         my $ssh=Framework::ssh_connect;
@@ -86,16 +85,17 @@ sub grade() {
 	$output[1] =~ s/(\d+)\w*/$1/;
 	$verbose and print "Size is: '$output[1]'\n";
 	print "Checking size:";
-	if ( ( $output[1] > 90 ) and ( $output[1] < 110 ) ) {
+	if ( ( $output[1] > 162 ) and ( $output[1] < 198 ) ) {
 		Framework::grade(0);
 	} else {
 		Framework::grade(1);
 		exit 1;
 	}
 	## Check filesystem type
-	$output=$ssh->capture("grep /mnt/das /proc/mounts | grep -q ext3; echo -n $?");
-	print "Checking filesystem type:";
-	if ( $output ) {
+        $output=$ssh->capture("grep /mnt/das /proc/mounts | grep -q ext3; echo -n \$?");
+	$verbose and print "Filesystem type output: $output\n";
+        print "Checking filesystem type:";
+        if ( $output ) {
                 Framework::grade(1);
                 exit 1;
         } else {
@@ -111,6 +111,21 @@ sub grade() {
 	} else {
 		Framework::grade(0);
 	}
+	Framework::mount("/mentes","vdb");
+	my @info=stat("/mentes/mulder");
+	$verbose and print "Ctime is: $info[10]\n";
+	open my $fh, "<", "/mentes/mulder" or (print "Missing file on disk." and exit 1);
+	my $time=do { local $/; <$fh> };
+	chomp $time;
+	$verbose and print "Time in file is: $time\n";
+	print "Data integrity:";
+	if ( $info[10] eq $time ) {
+		Framework::grade(0);
+	} else {
+		Framework::grade(1);
+		exit 1;
+	}
+	Framework::umount("/mentes"."vdb");;
 	## Running post
 	&post();
 }
@@ -118,19 +133,14 @@ sub grade() {
 sub pre() {
 	### Prepare the machine 
 	$verbose and print "Running pre section\n";
-	my $free=Disk::lvm_free;
-	$verbose and print "Free space :$free\n";
-	if ( $free > 300 ) {
-		$verbose and print "We have enough space to continue.\n";
-	} else {
-		print "Not enough space on server. We need to free up some space.";
-		if ( Disk::lv_count ne 4 ) {
-			print "You have " . Disk::lv_count . " lv-s on the server instead of 4. We should restore default settings.\n";
-			Disk::base;
-		} else {
-			print "Count is ok. Dev should investigate problem.\n";
-			exit 1;
-		}
+	open my $command, "/scripts/02-physical_disk/1.pl -g|" or (print "Couldn't execute test.\n" and exit 1);
+	while (<$command>) {
+		print;
+	}
+	close $command;
+	if ( ${^CHILD_ERROR_NATIVE} != 0 ) {
+		print "Previous task not yet completed.\n";
+		exit 1;
 	}
 }
 

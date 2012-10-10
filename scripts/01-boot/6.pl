@@ -68,14 +68,13 @@ sub grade() {
 	my $output=$ssh->capture("uname -r");
 	chomp $output;
 	$verbose and print "Kernel version is:'$output'\n";
-	print "Kernel version: [ ";
+	print "Kernel version:";
 	if ( "$output" eq "2.6.32-279.el6.x86_64" ) {
 		Framework::grade(1);
 	} else {
 		Framework::grade(0);
 	}
-	print " ]\n";
-	print "Number of yum repos: [ ";
+	print "Number of yum repos:";
 	$output=$ssh->capture("grep \\\\[ /etc/yum.repos.d/*.repo |wc -l");
 	chomp $output;
 	$verbose and print "Repo number is:'$output'\n";
@@ -84,7 +83,6 @@ sub grade() {
         } else {
                 Framework::grade(1);
         }
-	print " ]\n";
 	## Running post
 	&post();
 }

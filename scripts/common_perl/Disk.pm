@@ -66,16 +66,16 @@ sub base() {
 			$verbose and print "Yes selected. restoreing default state.\n";
 			my %lv=get_logical_volume_information("vg_desktop");
 			foreach my $lvname (sort keys %lv) {
-				if ( $lvname == "LogVol00" or ($lvname == "LogVol01" or ($lvname == "server" or $lvname == "web") ) ) {
+				if ( $lvname eq "LogVol00" or ($lvname eq "LogVol01" or ($lvname eq "server" or $lvname eq "web") ) ) {
 					$verbose and print "This is a base lv. Leaving.\n";
 				} else {
-					print "$lvname is a non base lv. We should delete it.\n";
+					print "\n$lvname is a non base lv. We should delete it.\n";
 					print "Is $lvname unused on internal server and can be deleted? [y/n] ";
 					my $confirm = <STDIN>;
 					chomp $confirm;
 					inner:
 					while (1) {
-						if ( $confirm == "y" ) {
+						if ( $confirm eq "y" ) {
 							$verbose and print "\nDeleting $lvname lv.\n";
 							my $ret=&lv_remove("$lvname");
 							if ( $ret eq 0) {
@@ -85,7 +85,7 @@ sub base() {
 								print "There was some problem deleting $lvname lv.\n";
 								last inner;
 							}
-						} elsif ( $confirm == "n" ) {
+						} elsif ( $confirm eq "n" ) {
 							print "\nNot doing anything as requested.\n";
 							last inner;
 						} else {
@@ -108,6 +108,10 @@ sub lv_remove($) {
 	## Removes lv
 	my ($lvname)=@_;
 	$lvname="/dev/mapper/vg_desktop-$lvname";
+	if ( !-e $lvname ) {
+		$verbose and print "There is no such lv.\n";
+		return 0;
+	}
 	$verbose and print "Removing $lvname.\n";
 	my $xml=&xml_parse;
 	$verbose and print "I got information.\n";
@@ -118,12 +122,12 @@ sub lv_remove($) {
         	$verbose and print "My length is:$length\n";
         	for ( my $i=0; $i < $length; $i++ ) {
 			$verbose and print "working on: ";
-			print Dumper($xml->{devices}->{disk}->[$i]);
+			$verbose and print Dumper($xml->{devices}->{disk}->[$i]);
 			if ( $lvname eq $xml->{devices}->{disk}->[$i]->{source}{dev} ) {
 				$verbose and print "Found match.\n";
 				my $target = $xml->{devices}->{disk}->[$i]->{target}{dev};
 				$verbose and print "My target is:$target\n";
-				system("virsh","detach-disk","server","$target");
+				system("virsh","detach-disk","server","$target","--persistent",">/dev/null","2>\&1");
 			}
         	}
 	} elsif ( ref($xml->{devices}->{disk}) eq "HASH" ) {
@@ -131,7 +135,7 @@ sub lv_remove($) {
 		if ( $lvname eq $xml->{devices}->{disk}->{source}{dev} ) {
 			my $target = $xml->{devices}->{disk}->{target}{dev};
 			$verbose and print "My target is:$target\n";
-			system("virsh","detach-disk","server","$target");
+			system("virsh","detach-disk","server","$target","--persistent",">/dev/null","2>\&1");
 		}
 	} else {
 		$verbose and print "Unknown reference. Something has gone wrong.\n";
@@ -144,6 +148,8 @@ sub lv_remove($) {
 	if ( $return eq 0 ) {
 		$verbose and print "Lvremove test was succesful. Doing real remove.\n";
 		my $ret=`lvremove -f $lvname >/dev/null 2>\&1 ; echo \$?`;
+		chomp $ret;
+		$verbose and print "My return for removal is: $ret\n";
 		if ( $ret eq 0 ) {
 			$verbose and print "Removal was succesful.\n";
 			return 0;
@@ -157,13 +163,32 @@ sub lv_remove($) {
 	}
 }
 
-sub lv_create($) {
+sub lv_create($$$) {
 	## Create lv
 	## Size should be accoring to PE size.
-	my ($lvname,$size)=@_;
+	my ($lvname,$size,$target)=@_;
 	## Pre tests
-	my $lv=get_lv_info("/dev/mapper/vg_desktop-$lvname");
-	$verbose and print Dumper();
+	if ( -e "/dev/mapper/vg_desktop-$lvname" ) {
+		$verbose and print "Already exists.\n";
+		$verbose and print "Testing if attached.\n";
+		my $count=`virsh dumpxml server | grep vdb |wc -l`;
+		chomp $count;
+		if ( $count eq 0 ) {  
+			my $ret=`/usr/bin/virsh attach-disk server /dev/mapper/vg_desktop-$lvname $target --persistent >/dev/null 2>\&1;echo \$?`;
+			chomp $ret;
+			$verbose and print "Attach return value is: $ret\n";
+			if ( $ret eq 0 ) {
+				$verbose and print "Succesful attached disk to server.\n";
+				return 0;
+			} else {
+				$verbose and print "There was an error attaching disk to server.\n";
+				return 1;
+			}
+		} else {
+			$verbose and print "Mounted on target already.\n";
+		}
+
+	}
 	my $free= &lvm_free;
 	$verbose and print "Free space: $free\n";
 	if ( $free lt $size ) {
@@ -175,7 +200,32 @@ sub lv_create($) {
 	my %vg_server= get_volume_group_information("vg_desktop");
 	my $unit=$vg_server{pe_size_unit};
 	$verbose and print "My PE size unit:$unit\n";
-	system();
+	#system("/sbin/lvcreate","-n $lvname","-L $size$unit","vg_desktop");
+	my $return=`/sbin/lvcreate -n $lvname -L $size$unit vg_desktop >/dev/null 2>\&1; echo \$?`;
+	chomp $return;
+	$verbose and print "Lvcreation ret value:$return\n";
+	if ( $return ne 0 ) {
+		$verbose and print "There was an error creating the lv\n";
+		return 1;
+	}
+	my %lv=get_logical_volume_information("vg_desktop");
+        foreach my $lvs (sort keys %lv) {
+		if ( $lvname == $lvs ) {
+			$verbose and print "Lv was created succesfully\n";
+			$verbose and print "Attaching to guest.\n";
+			my $ret=`/usr/bin/virsh attach-disk server /dev/mapper/vg_desktop-$lvname $target --persistent >/dev/null 2>\&1;echo \$?`;
+			chomp $ret;
+			$verbose and print "Attach return value is: $ret\n";
+			if ( $ret eq 0 ) {
+				$verbose and print "Succesful attached disk to server.\n";
+				return 0;
+			} else {
+				$verbose and print "There was an error attaching disk to server.\n";
+				return 1;
+			}
+		} 
+	}
+	return 1;
 }
 
 sub xml_parse() {

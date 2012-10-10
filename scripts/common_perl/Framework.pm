@@ -95,9 +95,9 @@ sub start (;$) {
 
 sub mount(;$$) {
 	### Parameters: server fs
-	my ($server, $fs)=@_;
-        $server ||="1.1.1.2";
+	my ($fs,$target)=@_;
         $fs ||="/mentes";
+	$target ||="server";
 	$verbose and print "Mount has been requested.\n";
 	$verbose and print "Checking if already mounted.\n";
 	open my $mounts, "/proc/mounts";
@@ -105,11 +105,11 @@ sub mount(;$$) {
                 chomp $line;
                 if ( $line=~/$fs/ ) {
                         $verbose and print "Found mount $fs, unmounting directory.\n";
-                        system("umount", "$fs");
+                        system("umount", "$fs",);
                 }
         }
 	$verbose and print "Mounting the internal filesystem.\n";
-	my $disk=`kpartx -av /dev/mapper/vg_desktop-server 2>/dev/null | head -n1 | awk '{print \$3}'`;
+	my $disk=`kpartx -av /dev/mapper/vg_desktop-$target 2>/dev/null | head -n1 | awk '{print \$3}'`;
         chomp $disk;
         $disk="/dev/mapper/$disk";
         $verbose and print "My disk is:$disk\n";
@@ -123,16 +123,16 @@ sub mount(;$$) {
 		}
 	}
         close $mounts;
-	system("kpartx -d /dev/mapper/vg_desktop-server >/dev/null 2>\&1");
+	system("kpartx -d /dev/mapper/vg_desktop-$target >/dev/null 2>\&1");
 	$verbose and print "Mount was not succesful.\n";
 	return 1;
 }
 
 sub umount(;$$) {
 	### Parameters: server fs
-	my ($server, $fs)=@_;
-        $server ||="1.1.1.2";
+	my ($fs, $target)=@_;
         $fs ||="/mentes";
+	$target ||="server";
 	$verbose and print "Umount has been requested.\n";
 	open my $mounts, "/proc/mounts";
         while ( my $line=<$mounts> ) {
@@ -152,7 +152,7 @@ sub umount(;$$) {
                 }
         }
 	$verbose and print "Umount was succesful.\n";
-	system("kpartx -d /dev/mapper/vg_desktop-server >/dev/null 2>\&1");
+	system("kpartx -d /dev/mapper/vg_desktop-$target >/dev/null 2>\&1");
 	close $mounts;
 	return 0;
 }
@@ -213,13 +213,18 @@ sub grade($) {
 	my ($grade)=@_;
 	$verbose and print "Grading user\n";
 	if ( $grade ) {
+		print " [ ";
 		print color 'bold red';
 		print 'Fail';
 		print color 'reset';
+		print " ]\n";
+		exit 1;
 	} else {
+		print " [ ";
 		print color 'bold green';
 		print 'PASS';
 		print color 'reset';
+		print " ]\n";
 	}
 }
 

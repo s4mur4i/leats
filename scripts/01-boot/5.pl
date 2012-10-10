@@ -71,9 +71,8 @@ sub grade() {
 	print "Grade has been selected.\n";
 	Framework::restart;
 	print "Test can take up to 1 minutes.\n";
-	print "Server booted succesfully: [ ";
+	print "Server booted succesfully:";
 	Framework::grade(Framework::timedconTo("60"));
-	print " ]\n";
 	## Running post
 	&post();
 }

@@ -1,0 +1,7 @@
+target		source			size M		comment
+vda		vg_desktop-server	4000		base lvm
+vdb		vg_desktop-vdb		200		physical disk management
+vdc		vg_desktop-vdc		250		raid test
+vdd		vg_desktop-vdd		250		raid test
+vde		vg_desktop-vde		250		raid test
+vdf		vg_desktop-vdf		250		raid test
