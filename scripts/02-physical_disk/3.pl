@@ -23,8 +23,8 @@ our $author='Krisztian Banhidy <krisztian@banhidy.hu>';
 our $version="v0.1";
 our $topic="Physical disk management";
 our $problem="2";
-our $description="Extend the partion previously created to 180 Mb (+-10%). \nA test file was created, which should be left on the filesystem. \nDo not destroy the filesystem and just recreate it.\n";
-our $hint="With fdisk delete the partition and just recreate it from same \nstarting sector. No metadata will be deleted. Then just use resize2fs.\n";
+our $description="Shrink the filesystem to 40 MB (+-10%) and convert it to ext4.\n";
+our $hint="To shrink a filesystem you have to convert it to ext2.\nThen resize it to the required size and convert it to ext4.\n";
 #
 #
 #
@@ -60,7 +60,7 @@ sub break() {
 	&pre();
 	print "Break has been selected.\n";
 	my $ssh=Framework::ssh_connect;
-	my $ret=$ssh->capture("rm /mnt/das/mulder >/dev/null 2>\&1 ;echo `date +%s` > /mnt/das/mulder 2>/dev/null; echo \$?");
+	my $ret=$ssh->capture("rm -f /mnt/das/scully >/dev/null 2>\&1;echo `date +%s` > /mnt/das/scully 2>/dev/null; echo \$?");
 	if ( $ret == 0 ) {
 		print "Your task: $description\n";
 	} else {
@@ -72,7 +72,7 @@ sub break() {
 sub grade() {
 	print "Grade has been selected.\n";
 	print "rebooting server:";
-	Framework::restart;
+	#Framework::restart;
 	Framework::grade(Framework::timedconTo("60"));
 	## Checking if mounted
         my $ssh=Framework::ssh_connect;
@@ -85,14 +85,14 @@ sub grade() {
 	$output[1] =~ s/(\d+)\w*/$1/;
 	$verbose and print "Size is: '$output[1]'\n";
 	print "Checking size:";
-	if ( ( $output[1] > 162 ) and ( $output[1] < 198 ) ) {
+	if ( ( $output[1] > 35 ) and ( $output[1] < 45 ) ) {
 		Framework::grade(0);
 	} else {
 		Framework::grade(1);
 		exit 1;
 	}
 	## Check filesystem type
-        $output=$ssh->capture("grep /mnt/das /proc/mounts | grep -q ext3; echo -n \$?");
+        $output=$ssh->capture("grep /mnt/das /proc/mounts | grep -q ext4; echo -n \$?");
 	$verbose and print "Filesystem type output: $output\n";
         print "Checking filesystem type:";
         if ( $output ) {
@@ -112,9 +112,9 @@ sub grade() {
 		Framework::grade(0);
 	}
 	Framework::mount("/mentes","vdb");
-	my @info=stat("/mentes/mulder");
+	my @info=stat("/mentes/scully");
 	$verbose and print "Ctime is: $info[10]\n";
-	open my $fh, "<", "/mentes/mulder" or (print "Missing file on disk." and exit 1);
+	open my $fh, "<", "/mentes/scully" or (print "Missing file on disk." and exit 1);
 	my $time=do { local $/; <$fh> };
 	chomp $time;
 	$verbose and print "Time in file is: $time\n";
@@ -125,7 +125,7 @@ sub grade() {
 		Framework::grade(1);
 		exit 1;
 	}
-	unlink("/mentes/mulder");
+	unlink("/mentes/scully");
 	Framework::umount("/mentes"."vdb");;
 	## Running post
 	&post();
@@ -133,8 +133,8 @@ sub grade() {
 
 sub pre() {
 	### Prepare the machine 
-	$verbose and print "Running dependency check\n";
-	open my $command, "/scripts/02-physical_disk/1.pl -g|" or (print "Couldn't execute test.\n" and exit 1);
+	$verbose and print "Running dependency check:\n";
+	open my $command, "/scripts/02-physical_disk/2.pl -g|" or (print "Couldn't execute test.\n" and exit 1);
 	while (<$command>) {
 		print;
 	}

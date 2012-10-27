@@ -19,33 +19,51 @@
 ##along with Leats.  If not, see <http://www.gnu.org/licenses/>.
 #############
 our $author='Krisztian Banhidy <krisztian@banhidy.hu>';
-#my $author="Richard Gruber <richard.gruber@it-services.hu>";
+#our $author='Richard Gruber <richard.gruber@it-services.hu>';
 our $version="v0.1";
-our $topic="developer";
-our $problem="none";
-our $description="For developer use.\n";
-our $hint="For developer use.\n";
 #
 #
 #
 #############
 our $verbose=0;
 my $help=0;
-my $break=0;
-my $grade=0;
-my $hint=0;
+my $mount=0;
+my $umount=0;
 use strict;
 use warnings;
 use Getopt::Long;
 use File::Basename;
 our $name=basename($0);
 use Sys::Virt;
+use Sys::Virt;
 use lib '/scripts/common_perl/';
-use Framework qw($verbose $topic $author $version $hint $problem $name);
+use Framework qw($verbose $author $version $name);
+#use Disk qw($verbose $topic $author $version $hint $problem $name);
+use Disk qw($verbose $author $version $name);
 ######
 ###Options
 ###
 GetOptions("help|?|h" => \$help,
            "verbose|v" => \$verbose,
+	   "mount|m" => \$mount,
+	   "umount|u" => \$umount
         );
-Framework::umount;
+if ( $help ) {
+	print "$name usage: $0 -v -h -m|-mount -u|-umount\n";
+	print "-h\t\thelp\n";
+	print "-v\t\tverbose\n";
+	print "-m|-mount\tmount the rescue cd\n";
+	print "-u|-umount\tumount the rescue cd\n";
+	exit 0;
+}
+if ( $mount ) {
+	print "Mount has been selected.\n";
+	Framework::shutdown;
+} elsif ( $umount ) {
+	print "Umount has been selected.\n";
+	Framework::shutdown;
+} else {
+        print "Nothing has been selected. Please select one option.\n";
+	exit 1;
+}
+
