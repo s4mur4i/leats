@@ -24,10 +24,10 @@ BEGIN {
 
     	@Framework::ISA         = qw(Exporter);
     	@Framework::EXPORT      = qw( &restart &shutdown &start &mount &umount &verbose &connecto &return &grade &timedconTo &useage &hint &ssh_connect );
-    	@Framework::EXPORT_OK   = qw( $verbose $topic $author $version $hint $problem $name);
+    	@Framework::EXPORT_OK   = qw( $verbose $topic $author $version $hint $problem $name $exercise_number $exercise_success $debug);
 
 }
-use vars qw ($verbose $topic $author $version $hint $problem $name);
+use vars qw ($verbose $topic $author $version $hint $problem $name $exercise_number $exercise_success $debug);
 sub restart (;$) {
 	### Parameters: server
 	my ($virt) = @_;
@@ -95,9 +95,9 @@ sub start (;$) {
 
 sub mount(;$$) {
 	### Parameters: server fs
-	my ($fs,$target)=@_;
+	my ($server, $fs)=@_;
+        $server ||="1.1.1.2";
         $fs ||="/mentes";
-	$target ||="server";
 	$verbose and print "Mount has been requested.\n";
 	$verbose and print "Checking if already mounted.\n";
 	open my $mounts, "/proc/mounts";
@@ -105,11 +105,11 @@ sub mount(;$$) {
                 chomp $line;
                 if ( $line=~/$fs/ ) {
                         $verbose and print "Found mount $fs, unmounting directory.\n";
-                        system("umount", "$fs",);
+                        system("umount", "$fs");
                 }
         }
 	$verbose and print "Mounting the internal filesystem.\n";
-	my $disk=`kpartx -av /dev/mapper/vg_desktop-$target 2>/dev/null | head -n1 | awk '{print \$3}'`;
+	my $disk=`kpartx -av /dev/mapper/vg_desktop-server 2>/dev/null | head -n1 | awk '{print \$3}'`;
         chomp $disk;
         $disk="/dev/mapper/$disk";
         $verbose and print "My disk is:$disk\n";
@@ -123,16 +123,16 @@ sub mount(;$$) {
 		}
 	}
         close $mounts;
-	system("kpartx -d /dev/mapper/vg_desktop-$target >/dev/null 2>\&1");
+	system("kpartx -d /dev/mapper/vg_desktop-server >/dev/null 2>\&1");
 	$verbose and print "Mount was not succesful.\n";
 	return 1;
 }
 
 sub umount(;$$) {
 	### Parameters: server fs
-	my ($fs, $target)=@_;
+	my ($server, $fs)=@_;
+        $server ||="1.1.1.2";
         $fs ||="/mentes";
-	$target ||="server";
 	$verbose and print "Umount has been requested.\n";
 	open my $mounts, "/proc/mounts";
         while ( my $line=<$mounts> ) {
@@ -152,7 +152,7 @@ sub umount(;$$) {
                 }
         }
 	$verbose and print "Umount was succesful.\n";
-	system("kpartx -d /dev/mapper/vg_desktop-$target >/dev/null 2>\&1");
+	system("kpartx -d /dev/mapper/vg_desktop-server >/dev/null 2>\&1");
 	close $mounts;
 	return 0;
 }
@@ -211,20 +211,22 @@ sub return($) {
 sub grade($) {
 	### Parameter: booleen
 	my ($grade)=@_;
-	$verbose and print "Grading user\n";
+	$debug and print "Grading user\n";
 	if ( $grade ) {
-		print " [ ";
-		print color 'bold red';
-		print 'Fail';
-		print color 'reset';
-		print " ]\n";
-		exit 1;
+		$verbose and print " [ ";
+		$verbose and print color 'bold red';
+		$verbose and print 'Fail';
+		$verbose and print color 'reset';
+		$verbose and print " ]\n";
+		$exercise_number++;
 	} else {
-		print " [ ";
-		print color 'bold green';
-		print 'PASS';
-		print color 'reset';
-		print " ]\n";
+		$verbose and print " [ ";
+		$verbose and print color 'bold green';
+		$verbose and print 'PASS';
+		$verbose and print color 'reset';
+		$verbose and print " ]\n";
+		${exercise_number}++;
+		${exercise_success}++;
 	}
 }
 
@@ -242,7 +244,7 @@ sub useage() {
         exit 0;
 };
 sub ssh_connect() {
-	$verbose and print "SSH connection to server.\n";
+	$debug and print "SSH connection to server.\n";
 	open my $stderr_fh, '>', '/dev/null';
 	my $ssh = Net::OpenSSH->new("server", key_path=>"/scripts/ssh-key/id_rsa", default_stderr_fh => $stderr_fh);
   	$ssh->error and ( $verbose and print "Couldn't establish SSH connection: ". $ssh->error);
