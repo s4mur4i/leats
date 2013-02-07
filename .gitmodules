@@ -1,3 +1,6 @@
 [submodule "scripts"]
 	path = scripts
 	url = git@github.com:s4mur4i/leats-scripts.git
+[submodule "install"]
+	path = install
+	url = git@github.com:s4mur4i/leats-install.git
